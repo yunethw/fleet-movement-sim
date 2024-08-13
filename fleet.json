@@ -1,0 +1,49 @@
+{
+  "type": "Train",
+  "collection": [
+    {
+      "name": "Colombo - Kandy Intercity Express",
+      "route": "FOT-KND",
+      "start": {
+        "name": "Colombo Fort",
+        "time": "07:00",
+        "coordinates": [
+          79.8500176,
+          6.93353430
+        ]
+      },
+      "stops": [
+        {
+          "name": "Gampaha",
+          "legDurationMins": 31,
+          "stopDurationMins": 1,
+          "coordinates": [
+            79.9926736,
+            7.092157
+          ]
+        },
+        {
+          "name": "Peradeniya",
+          "legDurationMins": 94,
+          "stopDurationMins": 2,
+          "coordinates": [
+            80.5902088,
+            7.2574397
+          ]
+        },
+        {
+          "name": "Kandy",
+          "legDurationMins": 28,
+          "stopDurationMins": 5,
+          "coordinates": [
+            80.631859,
+            7.289194
+          ]
+        }
+      ],
+      "maxSpeed": 19.44,
+      "maxAcceleration": 0.15,
+      "breakingDistance": 2500
+    }
+  ]
+}
