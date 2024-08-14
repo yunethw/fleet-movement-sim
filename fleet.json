@@ -3,6 +3,7 @@
   "collection": [
     {
       "name": "Colombo - Kandy Intercity Express",
+      "deviceMAC": "00:0A:95:9D:68:16",
       "route": "FOT-KND",
       "start": {
         "name": "Colombo Fort",
