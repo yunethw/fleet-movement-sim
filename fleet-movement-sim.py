@@ -2,6 +2,9 @@
 # Traveling along predefined routes
 from typing import List
 import json
+import geojson
+from shapely.geometry import shape, Point, LineString
+from geopy.distance import geodesic
 
 
 class Start:
@@ -9,6 +12,9 @@ class Start:
         self.name = name
         self.time = time
         self.coordinates = coordinates
+
+    def __str__(self):
+        return f'{self.name} {self.time} {self.coordinates}'
 
 
 class Stop:
@@ -23,37 +29,68 @@ class Stop:
 
 
 class Train:
-    def __init__(self, name: str, route: str, start: Start, stops: List[Stop], max_speed, max_acceleration, breaking_distance):
+    route: LineString
+    Vc = 0.0  # Current velocity
+    Vt = 0.0  # Target velocity
+    Vmax = 0.0  # Maximum velocity
+    A = 0.0  # Acceleration
+    Dbreak = 0.0  # Breaking distance
+
+    def __init__(self, name: str, mac: str, route: str,
+                 start: Start, stops: List[Stop], max_speed, max_acceleration, breaking_distance):
         self.name = name
-        self.route = route
+        self.device_mac = mac
+        self.route_name = route
         self.start = start
         self.stops = stops
-        self.max_speed = max_speed
-        self.max_acceleration = max_acceleration
-        self.breaking_distance = breaking_distance
+        self.Vmax = max_speed
+        self.A = max_acceleration
+        self.Dbreak = breaking_distance
+
+    def setRouteLineString(self, route: LineString):
+        self.route = route
 
     def __str__(self):
         return f'''Train: {self.name}
-        Route: {self.route}
-        Start: {self.start.name} {self.start.time} {self.start.coordinates}
+        Device MAC: {self.device_mac}
+        Route: {self.route_name}
+        Start: {str(self.start)}
         Stops: {', '.join([str(stop) for stop in self.stops])}
-        Max Speed: {self.max_speed}
-        Max Acceleration: {self.max_acceleration}
-        Breaking Distance: {self.breaking_distance}
+        Max Speed: {self.Vmax}
+        Max Acceleration: {self.A}
+        Breaking Distance: {self.Dbreak}
         '''
 
 
 def main():
+    railway_routes = geojson.load(open('railway-routes.geojson'))
+    for feature in railway_routes['features']:
+        total_distance = 0.0
+        coords = feature['geometry']['coordinates']
+        for i in range(len(coords) - 1):
+            point1 = (coords[i][1], coords[i][0])
+            point2 = (coords[i + 1][1], coords[i + 1][0])
+            total_distance += geodesic(point1, point2).kilometers
+        print(feature['properties']['name'], feature['geometry']['type'], len(feature['geometry']['coordinates']), 'coordinates', round(total_distance, 3), 'km')
+
     trains = []
     with open('fleet.json') as f:
         data = json.load(f)
         for train_data in data['collection']:
             start = Start(train_data['start']['name'], train_data['start']['time'], train_data['start']['coordinates'])
             stops = []
+
             for stop_data in train_data['stops']:
                 stop = Stop(stop_data['name'], stop_data['legDurationMins'], stop_data['stopDurationMins'], stop_data['coordinates'])
                 stops.append(stop)
-            train = Train(train_data['name'], train_data['route'], start, stops, train_data['maxSpeed'], train_data['maxAcceleration'], train_data['breakingDistance'])
+
+            train = Train(train_data['name'], train_data['deviceMAC'], train_data['route'], start, stops, train_data['maxSpeed'], train_data['maxAcceleration'], train_data['breakingDistance'])
+
+            for feature in railway_routes['features']:
+                if feature['properties']['name'] == train_data['route']:
+                    route = shape(feature['geometry'])
+                    train.setRouteLineString(route)
+                    break
             print(train)
             trains.append(train)
 
