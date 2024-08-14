@@ -5,6 +5,7 @@
       "name": "Colombo - Kandy Intercity Express",
       "deviceMAC": "00:0A:95:9D:68:16",
       "route": "FOT-KND",
+      "routeDirection": "Up",
       "start": {
         "name": "Colombo Fort",
         "time": "07:00",

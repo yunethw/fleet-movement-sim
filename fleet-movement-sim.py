@@ -36,11 +36,12 @@ class Train:
     A = 0.0  # Acceleration
     Dbreak = 0.0  # Breaking distance
 
-    def __init__(self, name: str, mac: str, route: str,
+    def __init__(self, name: str, mac: str, route: str, direction: str,
                  start: Start, stops: List[Stop], max_speed, max_acceleration, breaking_distance):
         self.name = name
         self.device_mac = mac
         self.route_name = route
+        self.route_direction = direction
         self.start = start
         self.stops = stops
         self.Vmax = max_speed
@@ -53,7 +54,7 @@ class Train:
     def __str__(self):
         return f'''Train: {self.name}
         Device MAC: {self.device_mac}
-        Route: {self.route_name}
+        Route: {self.route_name} {self.route_direction}
         Start: {str(self.start)}
         Stops: {', '.join([str(stop) for stop in self.stops])}
         Max Speed: {self.Vmax}
@@ -71,20 +72,24 @@ def main():
             point1 = (coords[i][1], coords[i][0])
             point2 = (coords[i + 1][1], coords[i + 1][0])
             total_distance += geodesic(point1, point2).kilometers
-        print(feature['properties']['name'], feature['geometry']['type'], len(feature['geometry']['coordinates']), 'coordinates', round(total_distance, 3), 'km')
+        print(feature['properties']['name'], feature['geometry']['type'],
+              len(feature['geometry']['coordinates']), 'coordinates', round(total_distance, 3), 'km')
 
     trains = []
     with open('fleet.json') as f:
         data = json.load(f)
         for train_data in data['collection']:
             start = Start(train_data['start']['name'], train_data['start']['time'], train_data['start']['coordinates'])
-            stops = []
 
+            stops = []
             for stop_data in train_data['stops']:
-                stop = Stop(stop_data['name'], stop_data['legDurationMins'], stop_data['stopDurationMins'], stop_data['coordinates'])
+                stop = Stop(stop_data['name'], stop_data['legDurationMins'],
+                            stop_data['stopDurationMins'], stop_data['coordinates'])
                 stops.append(stop)
 
-            train = Train(train_data['name'], train_data['deviceMAC'], train_data['route'], start, stops, train_data['maxSpeed'], train_data['maxAcceleration'], train_data['breakingDistance'])
+            train = Train(train_data['name'], train_data['deviceMAC'], train_data['route'],
+                          train_data['routeDirection'], start, stops, train_data['maxSpeed'],
+                          train_data['maxAcceleration'], train_data['breakingDistance'])
 
             for feature in railway_routes['features']:
                 if feature['properties']['name'] == train_data['route']:
