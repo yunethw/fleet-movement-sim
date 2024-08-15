@@ -58,6 +58,18 @@ class Train:
         self.df = None
         self.v_c = 0.0
         self.v_t = 0.0
+        self.loc_index = None
+
+    def __str__(self):
+        return f'''Train: {self.name}
+        Device MAC: {self.device_mac}
+        Route: {self.route_name} {self.route_direction}
+        Start: {str(self.start)}
+        Stops: {', '.join([str(stop) for stop in self.stops])}
+        Max Speed: {self.v_max}
+        Max Acceleration: {self.a}
+        Breaking Distance: {self.d_break}
+        '''
 
     def setRouteLineString(self, route: LineString):
         self.route = route
@@ -78,22 +90,30 @@ class Train:
                     stop.setIndex(i)
                     break
 
-        cum_dist = np.cumsum(gap)
+        cum_dist = [round(x, 3) for x in np.cumsum(gap)]
         self.df['Gap'] = gap
         self.df['CumulativeDistance'] = cum_dist
         # print(self.df.head(10))
         # print(self.df.tail(10))
 
-    def __str__(self):
-        return f'''Train: {self.name}
-        Device MAC: {self.device_mac}
-        Route: {self.route_name} {self.route_direction}
-        Start: {str(self.start)}
-        Stops: {', '.join([str(stop) for stop in self.stops])}
-        Max Speed: {self.v_max}
-        Max Acceleration: {self.a}
-        Breaking Distance: {self.d_break}
-        '''
+    def startJourney(self):
+        self.loc_index = self.start.index
+        print(self.distanceToNextStop())
+
+    def distanceToNextStop(self):
+        if self.loc_index is None:
+            return None
+        if str.lower(self.route_direction) == 'up':
+            for stop in self.stops:
+                if stop.index > self.loc_index:
+                    return self.df['CumulativeDistance'][stop.index] - self.df['CumulativeDistance'][self.loc_index]
+            return None
+        elif str.lower(self.route_direction) == 'down':
+            for stop in self.stops:
+                if stop.index < self.loc_index:
+                    return self.df['CumulativeDistance'][self.loc_index] - self.df['CumulativeDistance'][stop.index]
+            return None
+        return None
 
 
 def main():
@@ -133,6 +153,9 @@ def main():
                     break
             print(train)
             trains.append(train)
+
+    for train in trains:
+        train.startJourney()
 
 
 if __name__ == "__main__":
