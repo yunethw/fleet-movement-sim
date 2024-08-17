@@ -5,6 +5,7 @@ import geojson
 import pandas as pd
 import numpy as np
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import List
 from shapely.geometry import shape, LineString
 from geopy.distance import geodesic
@@ -107,12 +108,13 @@ class Train:
         self.en_route = True
         self.loc_section_index = self.start.df_index
         self.loc_coords = self.start.coordinates
+        print(f'{self.name} is en route')
         while self.en_route:
             self.setTargetSpeed()
             self.setAcceleration()
-            print('Vc:', self.v_c, 'Vt:', self.v_t, 'A', self.a)
+            # print('Vc:', self.v_c, 'Vt:', self.v_t, 'A', self.a)
             time.sleep(5)
-            print('After 5 seconds')
+            # print('After 5 seconds')
             self.moveTrain(5)
             self.cltt += 5
             if self.isCurrentLocAStop():
@@ -185,15 +187,15 @@ class Train:
     def moveTrain(self, t):
         s = self.calcDistanceTravelledInTime(t)
         self.v_c = self.calcSpeedAfterTime(t)
-        print('Total time: ', self.cltt)
-        print('Distance traveled: ', s, 'Vc: ', self.v_c)
-        print('Distance to next stop: ', self.calcDistanceToNextStop())
+        # print('Total time: ', self.cltt)
+        # print('Distance traveled: ', s, 'Vc: ', self.v_c)
+        # print('Distance to next stop: ', self.calcDistanceToNextStop())
         i, (long, lat) = self.findNewLocationCoordsAndSectionIndex(s)
         self.loc_section_index = i
         self.loc_coords = (long, lat)
-        print(i, long, lat)
-        print(self.bearing)
-        print()
+        # print(i, long, lat)
+        # print(self.bearing)
+        # print()
 
     def calcDistanceTravelledInTime(self, t):  # s = ut + 0.5at^2
         u, a = self.v_c, self.a
@@ -293,6 +295,9 @@ class Train:
         # v^2 = u^2 + 2as where v = 0
         return (u ** 2) / (2 * self.dec_max)
 
+    def printStatus(self):
+        print(f'{self.name}\nLoc: {self.loc_coords}  Speed: {round(self.v_c, 3)}  Bearing: {self.bearing}')
+
 
 def main():
     railway_routes = geojson.load(open('railway-routes.geojson'))
@@ -332,9 +337,14 @@ def main():
             print(train)
             trains.append(train)
 
+    pool = ThreadPoolExecutor(max_workers=len(trains))
     for train in trains:
-        # TODO: send to threadpool
-        train.startJourney()
+        pool.submit(train.startJourney)
+
+    while True:
+        for train in trains:
+            train.printStatus()
+        time.sleep(10)
 
     # TODO: send current location of trains every 30 seconds to server
 
