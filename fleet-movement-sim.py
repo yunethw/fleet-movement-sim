@@ -160,12 +160,14 @@ class Train:
         elif s == 0:
             self.v_t = 0.0
         else:
+            # s = vt at constant speed
             t = self.stops[0].leg_duration_mins * 60 - self.cltt
             v = s / t
             self.v_t = round(v, 3) if v < self.v_max else self.v_max
 
     def setAcceleration(self):
         if self.distanceToNextStop() < self.d_break:
+            # v^2 = u^2 + 2as
             s = self.distanceToNextStop()
             u = self.v_c
             self.a = - (u ** 2) / (2 * s)
@@ -185,16 +187,18 @@ class Train:
         print()
 
     def distanceTravelledInTime(self, t):
+        # s = ut + 0.5at^2
         u = self.v_c
         a = self.a
         return (u * t) + (0.5 * a * (t ** 2))
 
     def speedAfterTime(self, t):
+        # v = u + at
         a = self.a
         v = self.v_c + (a * t)
         return v if v < self.v_t else self.v_t
 
-    def findNewLocationCoordsAndSectionIndex(self, s):  # gets index of location s distance away from current location
+    def findNewLocationCoordsAndSectionIndex(self, s):
         """
         Gets index and coordinates of new location s meters away from current location
         :param s: distance from current location
@@ -232,7 +236,7 @@ class Train:
 
     def getNewLocationCoords(self, index, d):
         """
-        Gets coordinates of location d meters away from index along the section
+        Gets coordinates of location d meters away from start of section on the section
         :param index: index of new location section
         :param d: distance from start of next location section
         :return: coordinates of new location
@@ -253,6 +257,10 @@ class Train:
         return round(point.longitude, 6), round(point.latitude, 6)
 
     def isCurrentLocAStop(self):
+        """
+        Checks if current location section is a stop
+        :return: True if current location is a stop, False otherwise
+        """
         return self.loc_section_index == self.stops[0].df_index
 
     def stopTrain(self):
