@@ -11,17 +11,17 @@ from geopy.distance import geodesic
 
 class Start:
 
-    def __init__(self, name, time, coordinates: tuple):
+    def __init__(self, name, start_time, coordinates: tuple):
         self.name = name
-        self.time = time
+        self.time = start_time
         self.coordinates = coordinates
-        self.index = 0
+        self.df_index = 0
 
     def __str__(self):
-        return f'{self.index} {self.name} {self.time} {self.coordinates}'
+        return f'{self.df_index} {self.name} {self.time} {self.coordinates}'
 
     def setIndex(self, index):
-        self.index = index
+        self.df_index = index
 
 
 class Stop:
@@ -31,13 +31,13 @@ class Stop:
         self.leg_duration_mins = leg_duration_mins
         self.stop_duration_mins = stop_duration_mins
         self.coordinates = coordinates
-        self.index = 0
+        self.df_index = 0
 
     def __str__(self):
-        return f'{self.index} {self.name} {self.coordinates}'
+        return f'{self.df_index} {self.name} {self.coordinates}'
 
     def setIndex(self, index):
-        self.index = index
+        self.df_index = index
 
 
 class Train:
@@ -47,18 +47,22 @@ class Train:
         self.name = name
         self.device_mac = mac
         self.route_name = route
-        self.route_direction = direction
+        self.route_direction = direction.lower()
         self.start = start
-        self.stops = stops
+        self.stops = stops  # list of stops - pop first stop when reached
         self.v_max = max_speed
-        self.a = max_acceleration
+        self.a_max = max_acceleration
         self.d_break = breaking_distance
 
         self.route = None
         self.df = None
         self.v_c = 0.0
         self.v_t = 0.0
-        self.loc_index = None
+        self.a = 0.0
+        self.loc_section_index = 0  # index of the point-to-point section on which the train is currently located
+        self.loc_coords = (0.0, 0.0)  # current location coordinates
+        self.cltt = 0.0  # current leg travel time
+        self.en_route = False
 
     def __str__(self):
         return f'''Train: {self.name}
@@ -67,7 +71,7 @@ class Train:
         Start: {str(self.start)}
         Stops: {', '.join([str(stop) for stop in self.stops])}
         Max Speed: {self.v_max}
-        Max Acceleration: {self.a}
+        Max Acceleration: {self.a_max}
         Breaking Distance: {self.d_break}
         '''
 
