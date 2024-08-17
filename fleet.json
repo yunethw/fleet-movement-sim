@@ -45,6 +45,7 @@
       ],
       "maxSpeed": 19.44,
       "maxAcceleration": 0.2,
+      "maxDeceleration": 0.0722,
       "breakingDistance": 2500
     }
   ]
