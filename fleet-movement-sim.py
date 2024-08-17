@@ -103,8 +103,19 @@ class Train:
         # print(self.df.tail(10))
 
     def startJourney(self):
-        self.loc_index = self.start.index
-        print(self.distanceToNextStop())
+        self.en_route = True
+        self.loc_section_index = self.start.df_index
+        self.loc_coords = self.start.coordinates
+        while self.en_route:
+            self.setTargetSpeed()
+            self.setAcceleration()
+            print('Vc:', self.v_c, 'Vt:', self.v_t, 'A', self.a)
+            time.sleep(5)
+            print('After 5 seconds')
+            self.moveTrain(5)
+            self.cltt += 5
+            if self.isCurrentLocAStop():
+                self.stopTrain()
 
     def distanceToNextStop(self):
         return self.coordToIndexDistance(self.loc_coords, self.stops[0].df_index)
@@ -290,7 +301,7 @@ def main():
             for feature in railway_routes['features']:
                 if feature['properties']['name'] == train_data['route']:
                     route = shape(feature['geometry'])
-                    train.setRouteLineString(route)
+                    train.setRouteDataFrame(route)
                     break
             print(train)
             trains.append(train)
