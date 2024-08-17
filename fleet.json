@@ -17,8 +17,8 @@
       "stops": [
         {
           "name": "Gampaha",
-          "legDurationMins": 31,
-          "stopDurationMins": 1,
+          "legDurationMins": 33,
+          "stopDurationMins": 2,
           "coordinates": [
             79.9926736,
             7.092157
@@ -26,8 +26,8 @@
         },
         {
           "name": "Peradeniya",
-          "legDurationMins": 94,
-          "stopDurationMins": 2,
+          "legDurationMins": 109,
+          "stopDurationMins": 1,
           "coordinates": [
             80.5902088,
             7.2574397
@@ -35,8 +35,8 @@
         },
         {
           "name": "Kandy",
-          "legDurationMins": 28,
-          "stopDurationMins": 5,
+          "legDurationMins": 10,
+          "stopDurationMins": 3,
           "coordinates": [
             80.631859,
             7.289194
@@ -45,8 +45,7 @@
       ],
       "maxSpeed": 19.44,
       "maxAcceleration": 0.2,
-      "maxDeceleration": 0.0722,
-      "breakingDistance": 2500
+      "maxDeceleration": 0.0722
     }
   ]
 }

@@ -45,7 +45,7 @@ class Stop:
 class Train:
 
     def __init__(self, name: str, mac: str, route: str, direction: str,
-                 start: Start, stops: List[Stop], max_speed, max_acceleration, breaking_distance):
+                 start: Start, stops: List[Stop], max_speed, max_acceleration, max_deceleration):
         self.name = name
         self.device_mac = mac
         self.route_name = route
@@ -54,7 +54,7 @@ class Train:
         self.stops = stops  # list of stops - pop first stop when reached
         self.v_max = max_speed
         self.a_max = max_acceleration
-        self.d_break = breaking_distance
+        self.dec_max = max_deceleration
 
         self.route = None
         self.df = None
@@ -63,6 +63,7 @@ class Train:
         self.a = 0.0
         self.loc_section_index = 0  # index of the point-to-point section on which the train is currently located
         self.loc_coords = (0.0, 0.0)  # current location coordinates
+        self.bearing = 0.0  # current bearing
         self.cltt = 0.0  # current leg travel time
         self.en_route = False
 
@@ -74,7 +75,7 @@ class Train:
         Stops: {', '.join([str(stop) for stop in self.stops])}
         Max Speed: {self.v_max}
         Max Acceleration: {self.a_max}
-        Breaking Distance: {self.d_break}
+        Max Deceleration: {self.dec_max}
         '''
 
     def setRouteDataFrame(self, route: LineString):
@@ -117,14 +118,14 @@ class Train:
             if self.isCurrentLocAStop():
                 self.stopTrain()
 
-    def distanceToNextStop(self):
+    def calcDistanceToNextStop(self):
         # 10 meters buffer
-        return 10 + self.coordToIndexDistance(self.loc_coords, self.stops[0].df_index)
+        return 10 + self.calcCoordToIndexDistance(self.loc_coords, self.stops[0].df_index)
 
-    def indexToIndexDistance(self, index1, index2):
+    def calcIndexToIndexDistance(self, index1, index2):
         return abs(self.df['CumulativeDistance'][index2] - self.df['CumulativeDistance'][index1])
 
-    def coordToIndexDistance(self, coord: tuple, index):
+    def calcCoordToIndexDistance(self, coord: tuple, index):
         """
         Gets distance between a coordinate and a future location index
         :param coord: coordinates
@@ -134,16 +135,16 @@ class Train:
         coord_point = (coord[1], coord[0])
         if index > self.loc_section_index:
             next_index_point = (self.df['Lat'][self.loc_section_index + 1], self.df['Long'][self.loc_section_index + 1])
-            return geodesic(coord_point, next_index_point).meters + self.indexToIndexDistance(self.loc_section_index + 1, index)
+            return geodesic(coord_point, next_index_point).meters + self.calcIndexToIndexDistance(self.loc_section_index + 1, index)
         elif index < self.loc_section_index:
             next_index_point = (self.df['Lat'][self.loc_section_index - 1], self.df['Long'][self.loc_section_index - 1])
-            return geodesic(coord_point, next_index_point).meters + self.indexToIndexDistance(self.loc_section_index - 1, index)
+            return geodesic(coord_point, next_index_point).meters + self.calcIndexToIndexDistance(self.loc_section_index - 1, index)
         else:
             # distance from current section start to given coordinates within the section
             index_point = (self.df['Lat'][index], self.df['Long'][index])
             return geodesic(coord_point, index_point).meters
 
-    def coordToCoordDistance(self, coord1: tuple, coord2: tuple):
+    def calcCoordToCoordDistance(self, coord1: tuple, coord2: tuple):
         """
         Gets distance between two coordinates
         :param coord1: first coordinates
@@ -155,7 +156,7 @@ class Train:
         return geodesic(coord1_point, coord2_point).meters
 
     def setTargetSpeed(self):
-        s = self.distanceToNextStop()
+        s = self.calcDistanceToNextStop()
         if self.cltt >= self.stops[0].leg_duration_mins * 60 and s > 0:
             self.v_t = self.v_max
         elif s == 0:
@@ -166,10 +167,11 @@ class Train:
             self.v_t = round(v, 3) if v < self.v_max else self.v_max
 
     def setAcceleration(self):
-        s = self.distanceToNextStop()
+        s = self.calcDistanceToNextStop()
+        d_break = self.calcBreakingDistanceForSpeed(self.v_c)
         if s == 0:
             self.a = 0.0
-        elif s < self.d_break:  # v^2 = u^2 + 2as
+        elif s < d_break:  # v^2 = u^2 + 2as
             u = self.v_c
             self.a = - round((u ** 2) / (2 * s), 5)
         elif self.v_c < self.v_t:
@@ -181,20 +183,23 @@ class Train:
             self.a = 0.0
 
     def moveTrain(self, t):
-        s = self.distanceTravelledInTime(t)
-        self.v_c = self.speedAfterTime(t)
+        s = self.calcDistanceTravelledInTime(t)
+        self.v_c = self.calcSpeedAfterTime(t)
+        print('Total time: ', self.cltt)
         print('Distance traveled: ', s, 'Vc: ', self.v_c)
+        print('Distance to next stop: ', self.calcDistanceToNextStop())
         i, (long, lat) = self.findNewLocationCoordsAndSectionIndex(s)
         self.loc_section_index = i
         self.loc_coords = (long, lat)
         print(i, long, lat)
+        print(self.bearing)
         print()
 
-    def distanceTravelledInTime(self, t):  # s = ut + 0.5at^2
+    def calcDistanceTravelledInTime(self, t):  # s = ut + 0.5at^2
         u, a = self.v_c, self.a
         return (u * t) + (0.5 * a * (t ** 2))
 
-    def speedAfterTime(self, t):  # v = u + at
+    def calcSpeedAfterTime(self, t):  # v = u + at
         a = self.a
         v = self.v_c + (a * t)
         return v if v > 0 else 0.0
@@ -207,12 +212,12 @@ class Train:
         """
         if self.route_direction == 'up':
             for i in range(self.loc_section_index + 1, self.stops[0].df_index + 1):
-                if self.coordToIndexDistance(self.loc_coords, i) >= s:
+                if self.calcCoordToIndexDistance(self.loc_coords, i) >= s:
                     new_section_index = i-1
                     if new_section_index != self.loc_section_index:
-                        d = s - self.coordToIndexDistance(self.loc_coords, new_section_index)
+                        d = s - self.calcCoordToIndexDistance(self.loc_coords, new_section_index)
                     else:
-                        d = self.coordToIndexDistance(self.loc_coords, self.loc_section_index) + s
+                        d = self.calcCoordToIndexDistance(self.loc_coords, self.loc_section_index) + s
                     coords = self.getNewLocationCoords(new_section_index, d)
                     break
             else:
@@ -220,12 +225,12 @@ class Train:
                 coords = self.stops[0].coordinates
         else:
             for i in range(self.loc_section_index - 1, self.stops[0].df_index - 1, -1):
-                if self.coordToIndexDistance(self.loc_coords, i) >= s:
+                if self.calcCoordToIndexDistance(self.loc_coords, i) >= s:
                     new_section_index = i+1
                     if new_section_index != self.loc_section_index:
-                        d = s - self.coordToIndexDistance(self.loc_coords, new_section_index)
+                        d = s - self.calcCoordToIndexDistance(self.loc_coords, new_section_index)
                     else:
-                        d = self.coordToIndexDistance(self.loc_coords, self.loc_section_index) + s
+                        d = self.calcCoordToIndexDistance(self.loc_coords, self.loc_section_index) + s
                     coords = self.getNewLocationCoords(new_section_index, d)
                     break
             else:
@@ -255,6 +260,7 @@ class Train:
         geod = Geod(ellps='WGS84')
         az12, az21, distance = geod.inv(point1[1], point1[0], point2[1], point2[0])
         point = geodesic(kilometers=d / 1000).destination(point1, az12)
+        self.bearing = az12
         return round(point.longitude, 6), round(point.latitude, 6)
 
     def isCurrentLocAStop(self):
@@ -278,6 +284,10 @@ class Train:
         self.stops.pop(0)
         if len(self.stops) == 0:
             self.en_route = False
+
+    def calcBreakingDistanceForSpeed(self, u):
+        # v^2 = u^2 + 2as where v = 0
+        return (u ** 2) / (2 * self.dec_max)
 
 
 def main():
@@ -308,7 +318,7 @@ def main():
 
             train = Train(train_data['name'], train_data['deviceMAC'], train_data['route'],
                           train_data['routeDirection'], start, stops, train_data['maxSpeed'],
-                          train_data['maxAcceleration'], train_data['breakingDistance'])
+                          train_data['maxAcceleration'], train_data['maxDeceleration'])
 
             for feature in railway_routes['features']:
                 if feature['properties']['name'] == train_data['route']:
