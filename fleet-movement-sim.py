@@ -111,7 +111,7 @@ class Train:
             self.setTargetSpeed()
             self.setAcceleration()
             print('Vc:', self.v_c, 'Vt:', self.v_t, 'A', self.a)
-            time.sleep(1)
+            time.sleep(5)
             print('After 5 seconds')
             self.moveTrain(5)
             self.cltt += 5
@@ -251,9 +251,13 @@ class Train:
             return self.df['Lat'][index], self.df['Long'][index]
 
         if self.route_direction == 'up':
+            if index == len(self.df) - 1:
+                return self.df['Long'][index], self.df['Lat'][index]
             point1 = (self.df['Lat'][index], self.df['Long'][index])
             point2 = (self.df['Lat'][index + 1], self.df['Long'][index + 1])
         else:
+            if index == 0:
+                return self.df['Long'][index], self.df['Lat'][index]
             point1 = (self.df['Lat'][index], self.df['Long'][index])
             point2 = (self.df['Lat'][index - 1], self.df['Long'][index - 1])
 
@@ -329,7 +333,10 @@ def main():
             trains.append(train)
 
     for train in trains:
+        # TODO: send to threadpool
         train.startJourney()
+
+    # TODO: send current location of trains every 30 seconds to server
 
 
 if __name__ == "__main__":
