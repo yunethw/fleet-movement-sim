@@ -110,7 +110,7 @@ class Train:
             self.setTargetSpeed()
             self.setAcceleration()
             print('Vc:', self.v_c, 'Vt:', self.v_t, 'A', self.a)
-            time.sleep(5)
+            time.sleep(1)
             print('After 5 seconds')
             self.moveTrain(5)
             self.cltt += 5
@@ -118,7 +118,8 @@ class Train:
                 self.stopTrain()
 
     def distanceToNextStop(self):
-        return self.coordToIndexDistance(self.loc_coords, self.stops[0].df_index)
+        # 10 meters buffer
+        return 10 + self.coordToIndexDistance(self.loc_coords, self.stops[0].df_index)
 
     def indexToIndexDistance(self, index1, index2):
         return abs(self.df['CumulativeDistance'][index2] - self.df['CumulativeDistance'][index1])
@@ -155,24 +156,27 @@ class Train:
 
     def setTargetSpeed(self):
         s = self.distanceToNextStop()
-        if self.cltt > self.stops[0].leg_duration_mins * 60 and s > 0:
+        if self.cltt >= self.stops[0].leg_duration_mins * 60 and s > 0:
             self.v_t = self.v_max
         elif s == 0:
             self.v_t = 0.0
-        else:
-            # s = vt at constant speed
+        else:  # s = vt at constant speed
             t = self.stops[0].leg_duration_mins * 60 - self.cltt
             v = s / t
             self.v_t = round(v, 3) if v < self.v_max else self.v_max
 
     def setAcceleration(self):
-        if self.distanceToNextStop() < self.d_break:
-            # v^2 = u^2 + 2as
-            s = self.distanceToNextStop()
+        s = self.distanceToNextStop()
+        if s == 0:
+            self.a = 0.0
+        elif s < self.d_break:  # v^2 = u^2 + 2as
             u = self.v_c
-            self.a = - (u ** 2) / (2 * s)
+            self.a = - round((u ** 2) / (2 * s), 5)
         elif self.v_c < self.v_t:
-            self.a = self.a_max
+            # v = u + at
+            v, u, t = self.v_t, self.v_c, 5
+            a = (v - u) / t
+            self.a = a if a < self.a_max else self.a_max
         else:
             self.a = 0.0
 
@@ -186,17 +190,14 @@ class Train:
         print(i, long, lat)
         print()
 
-    def distanceTravelledInTime(self, t):
-        # s = ut + 0.5at^2
-        u = self.v_c
-        a = self.a
+    def distanceTravelledInTime(self, t):  # s = ut + 0.5at^2
+        u, a = self.v_c, self.a
         return (u * t) + (0.5 * a * (t ** 2))
 
-    def speedAfterTime(self, t):
-        # v = u + at
+    def speedAfterTime(self, t):  # v = u + at
         a = self.a
         v = self.v_c + (a * t)
-        return v if v < self.v_t else self.v_t
+        return v if v > 0 else 0.0
 
     def findNewLocationCoordsAndSectionIndex(self, s):
         """
@@ -261,7 +262,10 @@ class Train:
         Checks if current location section is a stop
         :return: True if current location is a stop, False otherwise
         """
-        return self.loc_section_index == self.stops[0].df_index
+        if self.route_direction == 'up':
+            return self.loc_section_index >= self.stops[0].df_index
+        else:
+            return self.loc_section_index <= self.stops[0].df_index
 
     def stopTrain(self):
         stop_duration_mins = self.stops[0].stop_duration_mins
