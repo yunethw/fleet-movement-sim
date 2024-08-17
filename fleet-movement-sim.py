@@ -4,9 +4,11 @@ import json
 import geojson
 import pandas as pd
 import numpy as np
+import time
 from typing import List
-from shapely.geometry import shape, Point, LineString
+from shapely.geometry import shape, LineString
 from geopy.distance import geodesic
+from pyproj import Geod
 
 
 class Start:
@@ -75,7 +77,7 @@ class Train:
         Breaking Distance: {self.d_break}
         '''
 
-    def setRouteLineString(self, route: LineString):
+    def setRouteDataFrame(self, route: LineString):
         self.route = route
         self.df = pd.DataFrame(route.coords, columns=['Long', 'Lat'])
         gap = []
@@ -105,19 +107,154 @@ class Train:
         print(self.distanceToNextStop())
 
     def distanceToNextStop(self):
-        if self.loc_index is None:
-            return None
-        if str.lower(self.route_direction) == 'up':
-            for stop in self.stops:
-                if stop.index > self.loc_index:
-                    return self.df['CumulativeDistance'][stop.index] - self.df['CumulativeDistance'][self.loc_index]
-            return None
-        elif str.lower(self.route_direction) == 'down':
-            for stop in self.stops:
-                if stop.index < self.loc_index:
-                    return self.df['CumulativeDistance'][self.loc_index] - self.df['CumulativeDistance'][stop.index]
-            return None
-        return None
+        return self.coordToIndexDistance(self.loc_coords, self.stops[0].df_index)
+
+    def indexToIndexDistance(self, index1, index2):
+        return abs(self.df['CumulativeDistance'][index2] - self.df['CumulativeDistance'][index1])
+
+    def coordToIndexDistance(self, coord: tuple, index):
+        """
+        Gets distance between a coordinate and a future location index
+        :param coord: coordinates
+        :param index: upcoming location index
+        :return: distance in meters
+        """
+        coord_point = (coord[1], coord[0])
+        if index > self.loc_section_index:
+            next_index_point = (self.df['Lat'][self.loc_section_index + 1], self.df['Long'][self.loc_section_index + 1])
+            return geodesic(coord_point, next_index_point).meters + self.indexToIndexDistance(self.loc_section_index + 1, index)
+        elif index < self.loc_section_index:
+            next_index_point = (self.df['Lat'][self.loc_section_index - 1], self.df['Long'][self.loc_section_index - 1])
+            return geodesic(coord_point, next_index_point).meters + self.indexToIndexDistance(self.loc_section_index - 1, index)
+        else:
+            # distance from current section start to given coordinates within the section
+            index_point = (self.df['Lat'][index], self.df['Long'][index])
+            return geodesic(coord_point, index_point).meters
+
+    def coordToCoordDistance(self, coord1: tuple, coord2: tuple):
+        """
+        Gets distance between two coordinates
+        :param coord1: first coordinates
+        :param coord2: second coordinates
+        :return: distance in meters
+        """
+        coord1_point = (coord1[1], coord1[0])
+        coord2_point = (coord2[1], coord2[0])
+        return geodesic(coord1_point, coord2_point).meters
+
+    def setTargetSpeed(self):
+        s = self.distanceToNextStop()
+        if self.cltt > self.stops[0].leg_duration_mins * 60 and s > 0:
+            self.v_t = self.v_max
+        elif s == 0:
+            self.v_t = 0.0
+        else:
+            t = self.stops[0].leg_duration_mins * 60 - self.cltt
+            v = s / t
+            self.v_t = round(v, 3) if v < self.v_max else self.v_max
+
+    def setAcceleration(self):
+        if self.distanceToNextStop() < self.d_break:
+            s = self.distanceToNextStop()
+            u = self.v_c
+            self.a = - (u ** 2) / (2 * s)
+        elif self.v_c < self.v_t:
+            self.a = self.a_max
+        else:
+            self.a = 0.0
+
+    def moveTrain(self, t):
+        s = self.distanceTravelledInTime(t)
+        self.v_c = self.speedAfterTime(t)
+        print('Distance traveled: ', s, 'Vc: ', self.v_c)
+        i, (long, lat) = self.findNewLocationCoordsAndSectionIndex(s)
+        self.loc_section_index = i
+        self.loc_coords = (long, lat)
+        print(i, long, lat)
+        print()
+
+    def distanceTravelledInTime(self, t):
+        u = self.v_c
+        a = self.a
+        return (u * t) + (0.5 * a * (t ** 2))
+
+    def speedAfterTime(self, t):
+        a = self.a
+        v = self.v_c + (a * t)
+        return v if v < self.v_t else self.v_t
+
+    def findNewLocationCoordsAndSectionIndex(self, s):  # gets index of location s distance away from current location
+        """
+        Gets index and coordinates of new location s meters away from current location
+        :param s: distance from current location
+        :return: index of new location section and coordinates of new location
+        """
+        if self.route_direction == 'up':
+            for i in range(self.loc_section_index + 1, self.stops[0].df_index + 1):
+                if self.coordToIndexDistance(self.loc_coords, i) >= s:
+                    new_section_index = i-1
+                    if new_section_index != self.loc_section_index:
+                        d = s - self.coordToIndexDistance(self.loc_coords, new_section_index)
+                    else:
+                        d = self.coordToIndexDistance(self.loc_coords, self.loc_section_index) + s
+                    coords = self.getNewLocationCoords(new_section_index, d)
+                    break
+            else:
+                new_section_index = self.stops[0].df_index
+                coords = self.stops[0].coordinates
+        else:
+            for i in range(self.loc_section_index - 1, self.stops[0].df_index - 1, -1):
+                if self.coordToIndexDistance(self.loc_coords, i) >= s:
+                    new_section_index = i+1
+                    if new_section_index != self.loc_section_index:
+                        d = s - self.coordToIndexDistance(self.loc_coords, new_section_index)
+                    else:
+                        d = self.coordToIndexDistance(self.loc_coords, self.loc_section_index) + s
+                    coords = self.getNewLocationCoords(new_section_index, d)
+                    break
+            else:
+                new_section_index = self.stops[0].df_index
+                coords = self.stops[0].coordinates
+
+        # coords = self.snapToRoute(coords, new_section_index)
+        return new_section_index, coords
+
+    def getNewLocationCoords(self, index, d):
+        """
+        Gets coordinates of location d meters away from index along the section
+        :param index: index of new location section
+        :param d: distance from start of next location section
+        :return: coordinates of new location
+        """
+        if index == self.stops[-1].df_index:
+            return self.df['Lat'][index], self.df['Long'][index]
+
+        if self.route_direction == 'up':
+            point1 = (self.df['Lat'][index], self.df['Long'][index])
+            point2 = (self.df['Lat'][index + 1], self.df['Long'][index + 1])
+        else:
+            point1 = (self.df['Lat'][index], self.df['Long'][index])
+            point2 = (self.df['Lat'][index - 1], self.df['Long'][index - 1])
+
+        geod = Geod(ellps='WGS84')
+        az12, az21, distance = geod.inv(point1[1], point1[0], point2[1], point2[0])
+        point = geodesic(kilometers=d / 1000).destination(point1, az12)
+        return round(point.longitude, 6), round(point.latitude, 6)
+
+    def isCurrentLocAStop(self):
+        return self.loc_section_index == self.stops[0].df_index
+
+    def stopTrain(self):
+        stop_duration_mins = self.stops[0].stop_duration_mins
+        print(f'Stopping at {self.stops[0].name} for {stop_duration_mins} minutes')
+        self.cltt = 0
+        self.v_c = 0.0
+        self.v_t = 0.0
+        self.a = 0.0
+        time.sleep(stop_duration_mins * 60)
+        self.stops.pop(0)
+        if len(self.stops) == 0:
+            self.en_route = False
 
 
 def main():
