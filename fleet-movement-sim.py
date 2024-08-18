@@ -296,7 +296,14 @@ class Train:
         return (u ** 2) / (2 * self.dec_max)
 
     def printStatus(self):
-        print(f'{self.name}\nLoc: {self.loc_coords}  Speed: {round(self.v_c, 3)}  Bearing: {self.bearing}')
+        print(f'{self.name}: {self.loc_coords}  Speed: {round(self.v_c, 3)}  Bearing: {self.bearing}')
+
+    def getStatus(self):
+        """
+        Get the current status of the train
+        :return: name, longitude, latitude, speed, bearing
+        """
+        return self.name, self.loc_coords[0], self.loc_coords[1], round(self.v_c, 3), round(self.bearing, 3)
 
 
 class GPS:
@@ -311,6 +318,7 @@ class GPS:
         while True:
             for train in self.trains:
                 train.printStatus()
+                name, long, lat, speed, bearing = train.getStatus()
             time.sleep(10)
 
     # TODO: send current location of trains every 30 seconds to server
