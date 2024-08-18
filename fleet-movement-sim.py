@@ -299,6 +299,23 @@ class Train:
         print(f'{self.name}\nLoc: {self.loc_coords}  Speed: {round(self.v_c, 3)}  Bearing: {self.bearing}')
 
 
+class GPS:
+    def __init__(self, trains: List[Train]):
+        self.trains = trains
+
+    def start(self):
+        pool = ThreadPoolExecutor(max_workers=len(self.trains))
+        for train in self.trains:
+            pool.submit(train.startJourney)
+
+        while True:
+            for train in self.trains:
+                train.printStatus()
+            time.sleep(10)
+
+    # TODO: send current location of trains every 30 seconds to server
+
+
 def main():
     railway_routes = geojson.load(open('railway-routes.geojson'))
     for feature in railway_routes['features']:
@@ -337,16 +354,8 @@ def main():
             print(train)
             trains.append(train)
 
-    pool = ThreadPoolExecutor(max_workers=len(trains))
-    for train in trains:
-        pool.submit(train.startJourney)
-
-    while True:
-        for train in trains:
-            train.printStatus()
-        time.sleep(10)
-
-    # TODO: send current location of trains every 30 seconds to server
+    gps = GPS(trains)
+    gps.start()
 
 
 if __name__ == "__main__":
