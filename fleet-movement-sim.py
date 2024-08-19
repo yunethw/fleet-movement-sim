@@ -321,7 +321,7 @@ class GPS:
             time.sleep(10)
 
     @staticmethod
-    def addNoise(long: float, lat: float, bearing: float):
+    def addNoise(long: float, lat: float, bearing: float = 0.0):
         """
         Adds noise to GPS coordinates.
         Gets a random eHPE(estimated horizontal position error) and
@@ -336,14 +336,14 @@ class GPS:
         """
         geod = Geod(ellps='WGS84')
         mu = 5  # mean
-        sigma = 7  # standard deviation
-        lower, upper = 0.0, 50.0  # bounds
+        sigma = 6  # standard deviation
+        lower, upper = 1.0, 50.0  # bounds
         a, b = (lower - mu) / sigma, (upper - mu) / sigma  # Z
-        ehpe = truncnorm.rvs(a, b, loc=mu, scale=sigma)
-        angle = np.random.triangular(bearing - 180, bearing, bearing + 180)
-        deviation = np.random.triangular(0, ehpe/2, ehpe)
-        gps_point = geod.fwd(long, lat, angle, deviation)
-        return gps_point[0], gps_point[1], ehpe
+        ehpe = truncnorm.rvs(a, b, loc=mu, scale=sigma, size=10000)
+        # angle = np.random.triangular(bearing - 180, bearing, bearing + 180)
+        # deviation = np.random.triangular(0, ehpe/2, ehpe)
+        # gps_point = geod.fwd(long, lat, angle, deviation)
+        return ehpe
 
     def sendLocation(self):
         # TODO: send current location of trains every 30 seconds to server
@@ -351,45 +351,62 @@ class GPS:
 
 
 def main():
-    railway_routes = geojson.load(open('railway-routes.geojson'))
-    for feature in railway_routes['features']:
-        total_distance = 0.0
-        coords = feature['geometry']['coordinates']
-        # for i in range(len(coords) - 1):
-        #     point1 = (coords[i][1], coords[i][0])
-        #     point2 = (coords[i + 1][1], coords[i + 1][0])
-        #     total_distance += geodesic(point1, point2).kilometers
-        print(feature['properties']['name'], feature['geometry']['type'],
-              len(feature['geometry']['coordinates']), 'coordinates', round(total_distance, 3), 'km')
+    # railway_routes = geojson.load(open('railway-routes.geojson'))
+    # for feature in railway_routes['features']:
+    #     total_distance = 0.0
+    #     coords = feature['geometry']['coordinates']
+    #     # for i in range(len(coords) - 1):
+    #     #     point1 = (coords[i][1], coords[i][0])
+    #     #     point2 = (coords[i + 1][1], coords[i + 1][0])
+    #     #     total_distance += geodesic(point1, point2).kilometers
+    #     print(feature['properties']['name'], feature['geometry']['type'],
+    #           len(feature['geometry']['coordinates']), 'coordinates', round(total_distance, 3), 'km')
+    #
+    # trains = []
+    # with open('fleet.json') as f:
+    #     data = json.load(f)
+    #     for train_data in data['collection']:
+    #         start_coords = tuple(round(c, 6) for c in train_data['start']['coordinates'])
+    #         start = Start(train_data['start']['name'], train_data['start']['time'], start_coords)
+    #
+    #         stops = []
+    #         for stop_data in train_data['stops']:
+    #             stop_coords = tuple(round(c, 6) for c in stop_data['coordinates'])
+    #             stop = Stop(stop_data['name'], stop_data['legDurationMins'],
+    #                         stop_data['stopDurationMins'], stop_coords)
+    #             stops.append(stop)
+    #
+    #         train = Train(train_data['name'], train_data['deviceMAC'], train_data['route'],
+    #                       train_data['routeDirection'], start, stops, train_data['maxSpeed'],
+    #                       train_data['maxAcceleration'], train_data['maxDeceleration'])
+    #
+    #         for feature in railway_routes['features']:
+    #             if feature['properties']['name'] == train_data['route']:
+    #                 route = shape(feature['geometry'])
+    #                 train.setRouteDataFrame(route)
+    #                 break
+    #         print(train)
+    #         trains.append(train)
+    #
+    # gps = GPS(trains)
+    # gps.start()
+    location = (79.850018, 6.933534)
+    sample = GPS.addNoise(location[0], location[1])
+    ninetyfifth = np.percentile(sample, 95)
+    prob_lt_3 = np.mean(sample < 3)
+    prob_lt_5 = np.mean(sample < 5)
+    prob_lt_10 = np.mean(sample < 10)
+    prob_gt_10 = np.mean(sample > 10)
+    prob_gt_20 = np.mean(sample > 20)
+    prob_gt_30 = np.mean(sample > 30)
+    print('95th percentile:', ninetyfifth)
+    print('Probability of eHPE < 3m:', prob_lt_3*100, '%')
+    print('Probability of eHPE < 5m:', prob_lt_5*100, '%')
+    print('Probability of eHPE < 10m:', prob_lt_10*100, '%')
+    print('Probability of eHPE > 10m:', prob_gt_10*100, '%')
+    print('Probability of eHPE > 20m:', prob_gt_20*100, '%')
+    print('Probability of eHPE > 30m:', prob_gt_30*100, '%')
 
-    trains = []
-    with open('fleet.json') as f:
-        data = json.load(f)
-        for train_data in data['collection']:
-            start_coords = tuple(round(c, 6) for c in train_data['start']['coordinates'])
-            start = Start(train_data['start']['name'], train_data['start']['time'], start_coords)
-
-            stops = []
-            for stop_data in train_data['stops']:
-                stop_coords = tuple(round(c, 6) for c in stop_data['coordinates'])
-                stop = Stop(stop_data['name'], stop_data['legDurationMins'],
-                            stop_data['stopDurationMins'], stop_coords)
-                stops.append(stop)
-
-            train = Train(train_data['name'], train_data['deviceMAC'], train_data['route'],
-                          train_data['routeDirection'], start, stops, train_data['maxSpeed'],
-                          train_data['maxAcceleration'], train_data['maxDeceleration'])
-
-            for feature in railway_routes['features']:
-                if feature['properties']['name'] == train_data['route']:
-                    route = shape(feature['geometry'])
-                    train.setRouteDataFrame(route)
-                    break
-            print(train)
-            trains.append(train)
-
-    gps = GPS(trains)
-    gps.start()
 
 
 if __name__ == "__main__":
