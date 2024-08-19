@@ -337,7 +337,7 @@ class GPS:
         """
         geod = Geod(ellps='WGS84')
         mu = 5  # mean
-        sigma = 7  # standard deviation
+        sigma = 6  # standard deviation
         lower, upper = 1.0, 50.0  # bounds
         a, b = (lower - mu) / sigma, (upper - mu) / sigma  # Z
         ehpe = truncnorm.rvs(a, b, loc=mu, scale=sigma)
