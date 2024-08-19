@@ -302,7 +302,7 @@ class Train:
         Get the current status of the train
         :return: name, longitude, latitude, speed, bearing
         """
-        return self.name, self.loc_coords[0], self.loc_coords[1], round(self.v_c, 3), round(self.bearing, 3)
+        return self.name, self.en_route, self.loc_coords[0], self.loc_coords[1], round(self.v_c, 3), round(self.bearing, 3)
 
 
 class GPS:
@@ -310,16 +310,10 @@ class GPS:
         self.trains = trains
 
     def start(self):
-        pool = ThreadPoolExecutor(max_workers=len(self.trains))
+        pool = ThreadPoolExecutor(max_workers=len(self.trains) * 2)
         for train in self.trains:
             pool.submit(train.startJourney)
-
-        while True:
-            for train in self.trains:
-                train.printStatus()
-                name, long, lat, speed, bearing = train.getStatus()
-                print(self.addNoise(long, lat, bearing))
-            time.sleep(10)
+            pool.submit(self.processData, train)
 
     @staticmethod
     def addNoise(long: float, lat: float, bearing: float):
@@ -346,7 +340,19 @@ class GPS:
         gps_point = geod.fwd(long, lat, angle, deviation)
         return gps_point[0], gps_point[1], ehpe
 
-    def sendLocation(self):
+    def processData(self, train: Train):
+        time.sleep(1)
+        print(f'Processing data for {train.name}')
+        name, en_route, long, lat, speed, bearing = train.getStatus()
+        while en_route:
+            long, lat, eHPE = self.addNoise(long, lat, bearing)
+            print(name, round(long, 6), round(lat, 6), speed, bearing, round(eHPE, 3))
+            self.send(name, round(long, 6), round(lat, 6), speed, bearing, round(eHPE, 3))
+            time.sleep(10)
+
+            name, en_route, long, lat, speed, bearing = train.getStatus()
+
+    def send(self, name, long, lat, speed, bearing, eHPE):
         # TODO: send current location of trains every 30 seconds to server
         pass
 
