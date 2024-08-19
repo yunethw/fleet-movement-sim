@@ -318,6 +318,7 @@ class GPS:
             for train in self.trains:
                 train.printStatus()
                 name, long, lat, speed, bearing = train.getStatus()
+                print(self.addNoise(long, lat, bearing))
             time.sleep(10)
 
     @staticmethod
@@ -337,7 +338,7 @@ class GPS:
         geod = Geod(ellps='WGS84')
         mu = 5  # mean
         sigma = 7  # standard deviation
-        lower, upper = 0.0, 50.0  # bounds
+        lower, upper = 1.0, 50.0  # bounds
         a, b = (lower - mu) / sigma, (upper - mu) / sigma  # Z
         ehpe = truncnorm.rvs(a, b, loc=mu, scale=sigma)
         angle = np.random.triangular(bearing - 180, bearing, bearing + 180)
