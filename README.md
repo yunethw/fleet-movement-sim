@@ -1,2 +1,2 @@
 # fleet-movement-sim
-A Python script to simulate movement of a fleet along a predefined route
+A Python script to simulate the movement of a train fleet along a predefined route
