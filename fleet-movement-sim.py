@@ -1,10 +1,9 @@
-# 10 Trains
-# Traveling along predefined routes
 import json
 import geojson
 import pandas as pd
 import numpy as np
 import time
+from scipy.stats import truncnorm
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
 from shapely.geometry import shape, LineString
@@ -321,7 +320,34 @@ class GPS:
                 name, long, lat, speed, bearing = train.getStatus()
             time.sleep(10)
 
-    # TODO: send current location of trains every 30 seconds to server
+    @staticmethod
+    def addNoise(long: float, lat: float, bearing: float):
+        """
+        Adds noise to GPS coordinates.
+        Gets a random eHPE(estimated horizontal position error) and
+        generates a point within eHPE meters of the given coordinates.
+        The actual point will be within the circle of radius eHPE meters around the returned coordinates.
+        The generated point will have a higher probability of being
+        in the direction of the bearing from the given coordinates.
+        :param long: longitude
+        :param lat: latitude
+        :param bearing: direction the train is moving
+        :return: longitude, latitude, eHPE
+        """
+        geod = Geod(ellps='WGS84')
+        mu = 5  # mean
+        sigma = 7  # standard deviation
+        lower, upper = 0.0, 50.0  # bounds
+        a, b = (lower - mu) / sigma, (upper - mu) / sigma  # Z
+        ehpe = truncnorm.rvs(a, b, loc=mu, scale=sigma)
+        angle = np.random.triangular(bearing - 180, bearing, bearing + 180)
+        deviation = np.random.triangular(0, ehpe/2, ehpe)
+        gps_point = geod.fwd(long, lat, angle, deviation)
+        return gps_point[0], gps_point[1], ehpe
+
+    def sendLocation(self):
+        # TODO: send current location of trains every 30 seconds to server
+        pass
 
 
 def main():
