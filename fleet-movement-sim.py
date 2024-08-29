@@ -12,6 +12,9 @@ from shapely.geometry import shape, LineString
 from geopy.distance import geodesic
 from pyproj import Geod
 
+POST_INTERVAL = 10  # seconds
+POST_URL = 'http://localhost:8080/v1/telemetry'
+# POST_URL = 'http://64.227.188.118/v1/telemetry'
 
 class Start:
 
@@ -350,12 +353,10 @@ class GPS:
             long, lat, eHPE = self.addNoise(long, lat, bearing)
             # print(name, round(long, 6), round(lat, 6), speed, bearing, round(eHPE, 3))
             self.send(name, train.device_mac, round(long, 6), round(lat, 6), speed, round(eHPE, 3))
-            time.sleep(10)
+            time.sleep(POST_INTERVAL)
             name, en_route, long, lat, speed, bearing = train.getStatus()
 
     def send(self, name, mac, long, lat, speed, eHPE):
-        url = 'http://localhost:8080/v1/telemetry'
-        # url = 'http://64.227.188.118/v1/telemetry'
         headers = {'Content-Type': 'application/json'}
 
         payload = {
@@ -372,7 +373,7 @@ class GPS:
         # "signalStrength": 0.0,
 
         payload_json = json.dumps(payload)
-        response = requests.post(url, headers=headers, data=payload_json, timeout=20)
+        response = requests.post(POST_URL, headers=headers, data=payload_json, timeout=20)
         print(response.status_code, response.content, payload_json)
 
 
