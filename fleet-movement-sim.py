@@ -3,6 +3,8 @@ import geojson
 import pandas as pd
 import numpy as np
 import time
+import requests
+from datetime import datetime
 from scipy.stats import truncnorm
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
@@ -72,7 +74,7 @@ class Train:
         Device MAC: {self.device_mac}
         Route: {self.route_name} {self.route_direction}
         Start: {str(self.start)}
-        Stops: {', '.join([str(stop) for stop in self.stops])}
+        End: {str(self.stops[-1])}
         Max Speed: {self.v_max}
         Max Acceleration: {self.a_max}
         Max Deceleration: {self.dec_max}
@@ -346,28 +348,39 @@ class GPS:
         name, en_route, long, lat, speed, bearing = train.getStatus()
         while en_route:
             long, lat, eHPE = self.addNoise(long, lat, bearing)
-            print(name, round(long, 6), round(lat, 6), speed, bearing, round(eHPE, 3))
-            self.send(name, round(long, 6), round(lat, 6), speed, bearing, round(eHPE, 3))
+            # print(name, round(long, 6), round(lat, 6), speed, bearing, round(eHPE, 3))
+            self.send(name, train.device_mac, round(long, 6), round(lat, 6), speed, round(eHPE, 3))
             time.sleep(10)
-
             name, en_route, long, lat, speed, bearing = train.getStatus()
 
-    def send(self, name, long, lat, speed, bearing, eHPE):
-        # TODO: send current location of trains every 30 seconds to server
-        pass
+    def send(self, name, mac, long, lat, speed, eHPE):
+        url = 'http://localhost:8080/v1/telemetry'
+        # url = 'http://64.227.188.118/v1/telemetry'
+        headers = {'Content-Type': 'application/json'}
+
+        payload = {
+            "deviceMAC": mac,
+            "time": datetime.now().isoformat(),
+            "telemetry": {
+                "longitude": long,
+                "latitude": lat,
+                "ehpe": eHPE,
+                "speed": speed,
+            }
+        }
+        # "elevation": 0.0,
+        # "signalStrength": 0.0,
+
+        payload_json = json.dumps(payload)
+        response = requests.post(url, headers=headers, data=payload_json, timeout=20)
+        print(response.status_code, response.content, payload_json)
 
 
 def main():
     railway_routes = geojson.load(open('railway-routes.geojson'))
     for feature in railway_routes['features']:
-        total_distance = 0.0
-        coords = feature['geometry']['coordinates']
-        # for i in range(len(coords) - 1):
-        #     point1 = (coords[i][1], coords[i][0])
-        #     point2 = (coords[i + 1][1], coords[i + 1][0])
-        #     total_distance += geodesic(point1, point2).kilometers
         print(feature['properties']['name'], feature['geometry']['type'],
-              len(feature['geometry']['coordinates']), 'coordinates', round(total_distance, 3), 'km')
+              len(feature['geometry']['coordinates']), 'coordinates')
 
     trains = []
     with open('fleet.json') as f:

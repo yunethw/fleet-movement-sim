@@ -2,7 +2,7 @@
   "type": "Train",
   "collection": [
     {
-      "name": "Colombo - Kandy Intercity Express",
+      "name": "1009",
       "deviceMAC": "00:0A:95:9D:68:16",
       "route": "FOT-KND",
       "routeDirection": "Up",
@@ -10,8 +10,8 @@
         "name": "Colombo Fort",
         "time": "07:00",
         "coordinates": [
-          79.8500176,
-          6.93353430
+          79.850018,
+          6.933534
         ]
       },
       "stops": [
@@ -20,7 +20,7 @@
           "legDurationMins": 33,
           "stopDurationMins": 2,
           "coordinates": [
-            79.9926736,
+            79.992674,
             7.092157
           ]
         },
@@ -29,8 +29,8 @@
           "legDurationMins": 109,
           "stopDurationMins": 1,
           "coordinates": [
-            80.5902088,
-            7.2574397
+            80.590209,
+            7.257440
           ]
         },
         {
