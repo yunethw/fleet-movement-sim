@@ -12,12 +12,12 @@ from shapely.geometry import shape, LineString
 from geopy.distance import geodesic
 from pyproj import Geod
 
-POST_INTERVAL = 10  # seconds
-POST_URL = 'http://localhost:8080/v1/telemetry'
-# POST_URL = 'http://64.227.188.118/v1/telemetry'
+POST_INTERVAL = 30  # seconds
+# POST_URL = 'http://localhost:8080/v1/telemetry'
+POST_URL = 'https://api.railtrack.yunethw.me/v1/telemetry'
+
 
 class Start:
-
     def __init__(self, name, start_time, coordinates: tuple):
         self.name = name
         self.time = start_time
@@ -285,7 +285,7 @@ class Train:
 
     def stopTrain(self):
         stop_duration_mins = self.stops[0].stop_duration_mins
-        print(f'Stopping at {self.stops[0].name} for {stop_duration_mins} minutes')
+        # print(f'Stopping at {self.stops[0].name} for {stop_duration_mins} minutes')
         self.cltt = 0
         self.v_c = 0.0
         self.v_t = 0.0
@@ -361,7 +361,7 @@ class GPS:
 
         payload = {
             "deviceMAC": mac,
-            "time": datetime.now().isoformat(),
+            "time": datetime.utcnow().isoformat(),
             "telemetry": {
                 "longitude": long,
                 "latitude": lat,
@@ -373,7 +373,7 @@ class GPS:
         # "signalStrength": 0.0,
 
         payload_json = json.dumps(payload)
-        response = requests.post(POST_URL, headers=headers, data=payload_json, timeout=20)
+        response = requests.post(POST_URL, headers= headers, data=payload_json, timeout=20)
         print(response.status_code, response.content, payload_json)
 
 
